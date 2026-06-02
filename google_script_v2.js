@@ -42,8 +42,65 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  // Configuración CORS (Google Apps Script lo maneja internamente con redirect, pero permitimos lectura pura)
   try {
+    var action = e.parameter.action;
+    
+    // Acción para navegar por archivos (Selector de Drive)
+    if (action === "list_drive") {
+      var folderId = e.parameter.folderId;
+      var targetFolder;
+      
+      if (folderId && folderId !== "root" && folderId !== "root_real") {
+        targetFolder = DriveApp.getFolderById(folderId);
+      } else if (folderId === "root_real") {
+        targetFolder = DriveApp.getRootFolder();
+      } else {
+        // Por defecto empieza en IA miramar si no se pide explícitamente root_real
+        var iter = DriveApp.getFoldersByName("IA miramar");
+        targetFolder = iter.hasNext() ? iter.next() : DriveApp.getRootFolder();
+      }
+      
+      var items = [];
+      
+      // Obtener subcarpetas
+      var folders = targetFolder.getFolders();
+      while (folders.hasNext()) {
+        var f = folders.next();
+        items.push({ id: f.getId(), name: f.getName(), type: 'folder' });
+      }
+      
+      // Obtener archivos (imágenes, pdfs, docs)
+      var files = targetFolder.getFiles();
+      while (files.hasNext()) {
+        var fi = files.next();
+        var mime = fi.getMimeType();
+        if (mime.indexOf('image/') !== -1 || mime.indexOf('pdf') !== -1) {
+          items.push({ 
+            id: fi.getId(), 
+            name: fi.getName(), 
+            type: 'file', 
+            url: fi.getUrl(),
+            thumbnail: mime.indexOf('image/') !== -1 ? fi.getDownloadUrl() : null // Some files might not have thumbnail
+          });
+        }
+      }
+      
+      // Ordenar: primero carpetas, luego archivos
+      items.sort(function(a, b) {
+        if (a.type === 'folder' && b.type === 'file') return -1;
+        if (a.type === 'file' && b.type === 'folder') return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      return ContentService.createTextOutput(JSON.stringify({ 
+        "status": "success", 
+        "currentFolderId": targetFolder.getId(),
+        "currentFolderName": targetFolder.getName(),
+        "items": items 
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Acción por defecto: listar carpetas para guardar
     var folderIterator = DriveApp.getFoldersByName("HotelBrain");
     var parentFolder = folderIterator.hasNext() ? folderIterator.next() : DriveApp.createFolder("HotelBrain");
     
@@ -55,6 +112,7 @@ function doGet(e) {
     
     return ContentService.createTextOutput(JSON.stringify({ "status": "success", "folders": foldersList }))
       .setMimeType(ContentService.MimeType.JSON);
+      
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
