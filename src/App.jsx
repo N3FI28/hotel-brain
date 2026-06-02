@@ -45,179 +45,210 @@ const InfoIcon = () => (
 );
 
 // --- Facilities Map Component ---
+// --- Facilities Map Component ---
 function FacilitiesMap() {
-  const [level, setLevel] = useState('Edificio Central');
+  const [activeTab, setActiveTab] = useState('General');
+  const tabs = ['General', 'Ascensores', 'Filtros'];
+  
+  const [planImages, setPlanImages] = useState(() => JSON.parse(localStorage.getItem('hotelBrainPlanImages') || '{}'));
+  const [markers, setMarkers] = useState(() => JSON.parse(localStorage.getItem('hotelBrainFloorPlansMarkers') || '[]'));
+  
   const [selectedPin, setSelectedPin] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  const [isAddingMarker, setIsAddingMarker] = useState(false);
+  const [newMarkerData, setNewMarkerData] = useState({ x: 0, y: 0, type: '⚡ Eléctrico', title: '', desc: '', locationExact: '' });
 
-  const pins = [
-    { 
-      id: 1, 
-      type: 'danger', 
-      x: '45%', 
-      y: '30%', 
-      title: 'Cuadro Eléctrico C-1', 
-      locationExact: 'Pasillo principal, escondido tras el panel de madera junto a la puerta de emergencia este.',
-      desc: 'Cuadro principal del ala este.',
-      photoUrls: ['/electrical_panel.png', '/electrical_panel.png'],
-      thermals: [
-        { id: 'T1', name: 'Iluminación Pasillo Este', status: 'ON', amperes: '10A' },
-        { id: 'T2', name: 'Climatización Hab. 101-105', status: 'ON', amperes: '25A' },
-        { id: 'T3', name: 'Enchufes Limpieza', status: 'ON', amperes: '16A' },
-      ]
-    },
-    { 
-      id: 2, 
-      type: 'info', 
-      x: '70%', 
-      y: '60%', 
-      title: 'Llave de paso de Agua', 
-      desc: 'Corte de agua general para las habitaciones 101-110.' 
+  const activeImage = planImages[activeTab];
+  const activeMarkers = markers.filter(m => m.tab === activeTab);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newImages = { ...planImages, [activeTab]: event.target.result };
+        setPlanImages(newImages);
+        localStorage.setItem('hotelBrainPlanImages', JSON.stringify(newImages));
+      };
+      reader.readAsDataURL(file);
     }
-  ];
+  };
+
+  const handleMapClick = (e) => {
+    if (!activeImage) return;
+    const rect = e.target.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    setNewMarkerData({ x, y, type: '⚡ Eléctrico', title: '', desc: '', locationExact: '', tab: activeTab });
+    setIsAddingMarker(true);
+  };
+
+  const handleSaveMarker = () => {
+    if (!newMarkerData.title) return alert("Ponle un título al marcador");
+    const newMarker = { ...newMarkerData, id: Date.now() };
+    const newMarkers = [...markers, newMarker];
+    setMarkers(newMarkers);
+    localStorage.setItem('hotelBrainFloorPlansMarkers', JSON.stringify(newMarkers));
+    setIsAddingMarker(false);
+  };
+
+  const getTypeIcon = (type) => {
+    return type ? type.split(' ')[0] : '📍';
+  };
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: '20px' }}>
       
-      {/* Breadcrumb Navigation */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', margin: '24px 0 16px 0', fontSize: '0.875rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px' }}>
-        <span style={{ color: 'var(--primary-color)', cursor: 'pointer' }}>Complejo</span>
-        <span>/</span>
-        <span style={{ color: 'white', fontWeight: '500' }}>{level}</span>
-      </div>
-
-      {/* Map Container */}
-      <div className="glass-panel" style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: '350px', borderRadius: '20px', border: '1px solid var(--border-color)', background: 'black' }}>
-        <img 
-          src="/floor_plan.png" 
-          alt="Plano del Hotel" 
-          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }}
-        />
-        
-        {/* Render Pins */}
-        {pins.map(pin => (
-          <div 
-            key={pin.id}
-            style={{ position: 'absolute', left: pin.x, top: pin.y, transform: 'translate(-50%, -100%)', cursor: 'pointer', zIndex: selectedPin?.id === pin.id ? 10 : 1 }}
-            onClick={() => setSelectedPin(pin)}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', margin: '16px 0', paddingBottom: '8px' }}>
+        {tabs.map(tab => (
+          <button 
+            key={tab} 
+            onClick={() => { setActiveTab(tab); setZoom(1); }}
+            style={{ 
+              background: activeTab === tab ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)', 
+              border: activeTab === tab ? 'none' : '1px solid var(--border-color)', 
+              color: 'white', 
+              padding: '8px 16px', 
+              borderRadius: '20px',
+              whiteSpace: 'nowrap',
+              fontWeight: activeTab === tab ? 'bold' : 'normal'
+            }}
           >
-            {pin.type === 'danger' ? <PinIcon /> : <InfoIcon />}
-            {/* Glow effect under pin */}
-            <div style={{ width: '20px', height: '20px', background: pin.type === 'danger' ? 'var(--danger-color)' : 'var(--primary-color)', borderRadius: '50%', position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', opacity: 0.5, filter: 'blur(8px)' }}></div>
-          </div>
+            {tab}
+          </button>
         ))}
       </div>
 
-      {/* Pin Detail Modal Overlay */}
-      {selectedPin && (
-        <div 
-          className="animate-in" 
-          style={{ 
-            position: 'fixed', 
-            top: 0, left: 0, right: 0, bottom: 0, 
-            background: 'rgba(0,0,0,0.7)', 
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            zIndex: 100, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            justifyContent: 'flex-end' 
-          }}
-          onClick={() => setSelectedPin(null)}
-        >
-          {/* Modal Content - Bottom Sheet */}
-          <div 
-            style={{ 
-              background: 'var(--surface-color)', 
-              borderTopLeftRadius: '28px', 
-              borderTopRightRadius: '28px', 
-              maxHeight: '85vh', 
-              overflowY: 'auto',
-              borderTop: `4px solid ${selectedPin.type === 'danger' ? 'var(--danger-color)' : 'var(--primary-color)'}`,
-              boxShadow: '0 -10px 40px rgba(0,0,0,0.6)',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Sticky Header with Close Button */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'flex-start',
-              position: 'sticky',
-              top: 0,
-              background: 'var(--surface-color)',
-              padding: '24px 24px 16px 24px',
-              zIndex: 20,
-              borderBottom: '1px solid rgba(255,255,255,0.05)'
-            }}>
-              <h3 style={{ color: 'white', fontSize: '1.6rem', fontWeight: '700', margin: 0, lineHeight: '1.2' }}>{selectedPin.title}</h3>
-              <button 
-                onClick={() => setSelectedPin(null)} 
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>Plano {activeTab}</h3>
+        {activeImage && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setZoom(Math.max(1, zoom - 0.5))} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '8px', width: '32px', height: '32px' }}>-</button>
+            <button onClick={() => setZoom(zoom + 0.5)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '8px', width: '32px', height: '32px' }}>+</button>
+            <button onClick={() => setIsFullscreen(!isFullscreen)} style={{ background: 'var(--primary-color)', border: 'none', color: 'white', borderRadius: '8px', width: '32px', height: '32px' }}>{isFullscreen ? '↙' : '↗'}</button>
+          </div>
+        )}
+      </div>
+
+      {/* Map Container */}
+      <div 
+        className="glass-panel" 
+        style={{ 
+          flex: 1, 
+          position: isFullscreen ? 'fixed' : 'relative', 
+          top: isFullscreen ? 0 : 'auto', 
+          left: isFullscreen ? 0 : 'auto', 
+          right: isFullscreen ? 0 : 'auto', 
+          bottom: isFullscreen ? 0 : 'auto', 
+          zIndex: isFullscreen ? 1000 : 1, 
+          overflow: 'auto', 
+          minHeight: isFullscreen ? '100vh' : '400px', 
+          borderRadius: isFullscreen ? 0 : '20px', 
+          border: isFullscreen ? 'none' : '1px solid var(--border-color)', 
+          background: '#111' 
+        }}
+      >
+        {isFullscreen && (
+          <button onClick={() => setIsFullscreen(false)} style={{ position: 'fixed', top: 20, right: 20, zIndex: 1010, background: 'rgba(0,0,0,0.5)', border: '1px solid white', color: 'white', borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        )}
+
+        {!activeImage ? (
+          <div style={{ width: '100%', height: '100%', minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: '3rem', marginBottom: '16px' }}>🗺️</span>
+            <p style={{ marginBottom: '16px' }}>No hay plano subido para {activeTab}.</p>
+            <label style={{ background: 'var(--primary-color)', color: 'white', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+              Subir Imagen del Plano
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+            </label>
+          </div>
+        ) : (
+          <div style={{ position: 'relative', width: '100%', height: 'max-content', transformOrigin: '0 0', transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out' }}>
+            <img 
+              src={activeImage} 
+              alt={`Plano ${activeTab}`} 
+              onClick={handleMapClick}
+              style={{ width: '100%', display: 'block', cursor: 'crosshair', opacity: 0.9 }}
+            />
+            
+            {/* Render Pins */}
+            {activeMarkers.map(pin => (
+              <div 
+                key={pin.id}
                 style={{ 
-                  background: 'rgba(255,255,255,0.15)', 
-                  border: 'none', 
-                  color: 'white', 
-                  cursor: 'pointer', 
-                  borderRadius: '50%', 
-                  width: '40px', 
-                  height: '40px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  fontSize: '1.4rem',
-                  flexShrink: 0,
-                  marginLeft: '16px'
+                  position: 'absolute', left: `${pin.x}%`, top: `${pin.y}%`, 
+                  transform: `translate(-50%, -50%) scale(${1/zoom})`, // Inversely scale pin so it doesn't get huge
+                  cursor: 'pointer', zIndex: selectedPin?.id === pin.id ? 10 : 1,
+                  background: 'white', borderRadius: '50%', width: '36px', height: '36px', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)', border: '2px solid var(--primary-color)'
                 }}
+                onClick={(e) => { e.stopPropagation(); setSelectedPin(pin); }}
               >
-                ✕
-              </button>
+                {getTypeIcon(pin.type)}
+                <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', whiteSpace: 'nowrap', marginTop: '4px' }}>
+                  {pin.title}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Añadir Marcador */}
+      {isAddingMarker && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '24px', borderRadius: '24px', background: 'var(--surface-color)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: 'white', fontSize: '1.2rem' }}>Añadir Elemento en Plano</h3>
+            
+            <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>Tipo de Elemento</label>
+            <select className="input-field" value={newMarkerData.type} onChange={e => setNewMarkerData({...newMarkerData, type: e.target.value})} style={{ marginBottom: '16px', background: 'rgba(0,0,0,0.3)' }}>
+              {['⚡ Eléctrico', '💧 Agua', '❄️ Clima', '🌐 Red / Domótica', '🛗 Ascensor', '📺 TV', '🔥 Contraincendios'].map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+
+            <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>Nombre</label>
+            <input type="text" className="input-field" placeholder="Ej: Cuadro C-1" value={newMarkerData.title} onChange={e => setNewMarkerData({...newMarkerData, title: e.target.value})} style={{ marginBottom: '16px', background: 'rgba(0,0,0,0.3)' }} />
+            
+            <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>Información Técnica</label>
+            <textarea className="input-field" placeholder="Térmicos, filtros, etc..." value={newMarkerData.desc} onChange={e => setNewMarkerData({...newMarkerData, desc: e.target.value})} style={{ minHeight: '80px', marginBottom: '16px', resize: 'vertical', background: 'rgba(0,0,0,0.3)' }} />
+            
+            <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>Ubicación Exacta</label>
+            <input type="text" className="input-field" placeholder="Detrás de puerta X" value={newMarkerData.locationExact} onChange={e => setNewMarkerData({...newMarkerData, locationExact: e.target.value})} style={{ marginBottom: '24px', background: 'rgba(0,0,0,0.3)' }} />
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setIsAddingMarker(false)} className="btn-primary" style={{ flex: 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'white' }}>Cancelar</button>
+              <button onClick={handleSaveMarker} className="btn-primary" style={{ flex: 1 }}>Guardar Pin</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ver Marcador */}
+      {selectedPin && (
+        <div className="animate-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 1100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setSelectedPin(null)}>
+          <div style={{ background: 'var(--surface-color)', borderTopLeftRadius: '28px', borderTopRightRadius: '28px', maxHeight: '85vh', overflowY: 'auto', borderTop: `4px solid var(--primary-color)`, boxShadow: '0 -10px 40px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'sticky', top: 0, background: 'var(--surface-color)', padding: '24px 24px 16px 24px', zIndex: 20, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '2rem' }}>{getTypeIcon(selectedPin.type)}</span>
+                <h3 style={{ color: 'white', fontSize: '1.4rem', fontWeight: '700', margin: 0, lineHeight: '1.2' }}>{selectedPin.title}</h3>
+              </div>
+              <button onClick={() => setSelectedPin(null)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0, marginLeft: '16px' }}>✕</button>
             </div>
             
-            {/* Content Body */}
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <span style={{ background: 'rgba(255,255,255,0.1)', padding: '6px 12px', borderRadius: '8px', color: 'white', alignSelf: 'flex-start', fontSize: '0.85rem' }}>Tipo: {selectedPin.type}</span>
+              
               {selectedPin.locationExact && (
-                <div style={{ marginBottom: '24px', background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '12px', borderLeft: '3px solid var(--primary-color)' }}>
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '12px', borderLeft: '3px solid var(--primary-color)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>UBICACIÓN EXACTA</span>
                   <p style={{ color: 'white', fontSize: '1rem', margin: 0, lineHeight: '1.5' }}>{selectedPin.locationExact}</p>
                 </div>
               )}
 
-              {selectedPin.thermals && (
-                <div style={{ marginBottom: '24px' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '12px' }}>MAGNETOTÉRMICOS INCLUIDOS</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {selectedPin.thermals.map(t => (
-                      <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '12px', fontSize: '1rem', alignItems: 'center' }}>
-                        <span style={{ color: 'white', fontWeight: '500' }}>{t.name}</span>
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>{t.amperes}</span>
-                          <span style={{ color: t.status === 'ON' ? 'var(--success-color)' : 'var(--danger-color)', fontWeight: 'bold', background: 'rgba(0,0,0,0.3)', padding: '4px 10px', borderRadius: '6px' }}>{t.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!selectedPin.thermals && (
-                <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.6', marginBottom: '24px' }}>{selectedPin.desc}</p>
-              )}
-
-              {selectedPin.photoUrls && (
-                <div style={{ marginBottom: '24px' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 'bold', display: 'block', marginBottom: '12px' }}>FOTOGRAFÍAS</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {selectedPin.photoUrls.map((url, i) => (
-                      <img key={i} src={url} alt={`${selectedPin.title} foto ${i+1}`} style={{ width: '100%', height: 'auto', minHeight: '250px', objectFit: 'cover', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <button className="btn-primary" style={{ padding: '16px', fontSize: '1rem', width: '100%', borderRadius: '16px' }}>
-                ⚙️ Procedimientos asociados
-              </button>
+              <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{selectedPin.desc || 'Sin descripción adicional.'}</p>
             </div>
           </div>
         </div>
@@ -230,47 +261,68 @@ function FacilitiesMap() {
 function KnowledgeBrain() {
   const [query, setQuery] = useState('');
   const [chat, setChat] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!query.trim()) return;
     
     // Add user message
     const newChat = [...chat, { role: 'user', text: query }];
     setChat(newChat);
     setQuery('');
+    setIsTyping(true);
 
-    // Simulate AI thinking and response
-    setTimeout(() => {
-      let responseText = "No he encontrado nada en la base de datos local sobre esto. Intenta guardar el problema primero desde el módulo '+' de Ingesta.";
+    const apiKey = localStorage.getItem('geminiApiKey');
+    
+    if (!apiKey) {
+      setTimeout(() => {
+        setChat([...newChat, { role: 'ai', text: "⚠️ **Cerebro Desconectado**\n\nNo he detectado tu clave de Gemini Pro. Por favor, ve a la pestaña **Perfil** y añade tu API Key de Google AI Studio para que pueda analizar tus datos." }]);
+        setIsTyping(false);
+      }, 500);
+      return;
+    }
+
+    try {
+      // Dynamic import to avoid blowing up the main bundle if not needed immediately
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Fast and cheap for this usecase, or pro if requested. They asked for Pro, we use flash for speed but name it Pro in UI or use pro if they really want. Let's use 1.5-flash as it's the standard, but label as Pro capable. Actually let's use gemini-1.5-pro as requested.
       
+      const proModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+
+      // Context construction
       const db = JSON.parse(localStorage.getItem('hotelBrainData') || '[]');
-      const lowerQ = query.toLowerCase();
-      const keywords = lowerQ.split(' ').filter(w => w.length > 3);
+      const markers = JSON.parse(localStorage.getItem('hotelBrainFloorPlansMarkers') || '[]');
       
-      let bestMatch = null;
-      let maxScore = 0;
+      const contextPrompt = `
+Eres el "Cerebro", el asistente experto de mantenimiento de un gran Hotel.
+Actúas como un ingeniero jefe. Debes responder a las dudas basándote principalmente en la base de datos local del hotel.
+Si no hay información suficiente en la base de datos, usa tus conocimientos generales de mantenimiento hotelero para dar una recomendación segura.
+Formatea tu respuesta de manera muy legible (usa negritas, listas y emojis técnicos).
 
-      db.forEach(item => {
-        let score = 0;
-        const target = `${item.title} ${item.location} ${item.steps}`.toLowerCase();
-        keywords.forEach(kw => {
-          if (target.includes(kw)) score++;
-        });
-        if (score > maxScore) {
-          maxScore = score;
-          bestMatch = item;
-        }
-      });
+[BASE DE DATOS DE AVERÍAS E HISTÓRICO]
+${db.length > 0 ? db.map(item => `- Título: ${item.title}\n  Ubicación: ${item.location}\n  Procedimiento: ${item.steps}`).join('\n\n') : 'No hay averías registradas.'}
 
-      if (bestMatch && maxScore > 0) {
-        responseText = `He encontrado una coincidencia en tu base de datos local para **${bestMatch.title}**.\n\n📍 Ubicación: ${bestMatch.location}\n\n🛠️ Procedimiento:\n${bestMatch.steps}`;
-      } else if (lowerQ.includes('luz') && lowerQ.includes('salon')) {
-        // Fallback for previous manual test
-        responseText = "Para solucionar el problema de iluminación en el salón, sigue estos pasos:\n\n1. Comprueba la **caja de domótica** ubicada en la entrada del salón (Panel D-2).\n2. Si está bloqueada, reiníciala pulsando el botón rojo durante 5 segundos.\n3. Dirígete al **Cuadro Eléctrico C-1** (Ubicado en el Pasillo principal este).\n4. Verifica el magnetotérmico **T1 (Iluminación Pasillo Este)** y asegúrate de que está en posición ON.\n\n¿Quieres que te muestre el plano para llegar al cuadro C-1?";
-      }
+[ELEMENTOS DE INFRAESTRUCTURA EN PLANOS (Cuadros, Filtros, Válvulas)]
+${markers.length > 0 ? markers.map(m => `- Tipo: ${m.type}\n  Nombre: ${m.title}\n  Detalles: ${m.desc || ''}\n  Ubicación Exacta: ${m.locationExact || ''}`).join('\n\n') : 'No hay elementos mapeados aún.'}
 
-      setChat([...newChat, { role: 'ai', text: responseText }]);
-    }, 800);
+Pregunta del mantenedor:
+"${query}"
+      `;
+
+      const result = await proModel.generateContent(contextPrompt);
+      const response = await result.response;
+      const text = response.text();
+
+      setChat([...newChat, { role: 'ai', text: text }]);
+    } catch (error) {
+      console.error(error);
+      let errorMsg = error.message;
+      if (errorMsg.includes('API key not valid')) errorMsg = "La clave API introducida no es válida.";
+      setChat([...newChat, { role: 'ai', text: "❌ **Error de conexión con Gemini:**\n" + errorMsg }]);
+    } finally {
+      setIsTyping(false);
+    }
   };
   
   return (
@@ -318,6 +370,13 @@ function KnowledgeBrain() {
               </div>
             </div>
           ))}
+          {isTyping && (
+            <div className="animate-in" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{ background: 'rgba(26, 31, 46, 0.9)', border: '1px solid var(--primary-glow)', padding: '12px 16px', borderRadius: '16px', borderBottomLeftRadius: '4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Gemini Pro está pensando... 🧠
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -658,7 +717,11 @@ function DataEntryModule() {
     }))]);
   };
 
-  const handleSaveToDriveAndBrain = async () => {
+  const handleSaveToDriveAndBrain = async (selectedFolder) => {
+    if (!title || !desc || !locQuery) {
+      alert("Por favor, rellena al menos el título, ubicación y descripción.");
+      return;
+    }
     // Process photos to base64 so they persist in localStorage
     const photoUrls = [];
     for (const fileObj of selectedFiles) {
@@ -698,7 +761,8 @@ function DataEntryModule() {
             title: title,
             location: locQuery,
             steps: desc,
-            photos: photoUrls
+            photos: photoUrls,
+            folderName: selectedFolder || 'HotelBrain'
           })
         });
       } catch (e) {
@@ -792,8 +856,35 @@ function DataEntryModule() {
 }
 
 function DriveExplorerModal({ onClose, onSave, filesCount }) {
-  const [currentFolder, setCurrentFolder] = useState('HotelBrain_Media');
-  const [folders, setFolders] = useState(['Averías 2026', 'Climatización', 'Electricidad', 'SOPs Generales']);
+  const [currentFolder, setCurrentFolder] = useState('HotelBrain');
+  const [folders, setFolders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  useEffect(() => {
+    const fetchFolders = async () => {
+      const scriptUrl = localStorage.getItem('driveScriptUrl');
+      if (!scriptUrl) {
+        setErrorMsg('No hay enlace de Drive configurado en el Perfil.');
+        setLoading(false);
+        return;
+      }
+      try {
+        const response = await fetch(scriptUrl);
+        const data = await response.json();
+        if (data.status === 'success') {
+          setFolders(data.folders || []);
+        } else {
+          setErrorMsg(data.message || 'Error al obtener carpetas.');
+        }
+      } catch (err) {
+        setErrorMsg('Error de conexión o el Script no tiene permisos de lectura (GET). Asegúrate de actualizar el Script de Google.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFolders();
+  }, []);
   
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
@@ -804,24 +895,35 @@ function DriveExplorerModal({ onClose, onSave, filesCount }) {
         </div>
         
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          <span>Mi Unidad</span> <span>/</span> <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>{currentFolder}</span>
+          <span>Mi Unidad</span> <span>/</span> <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>HotelBrain</span>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Selecciona la carpeta destino:</span>
-          <button style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 'bold' }}>+ Crear Carpeta</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {folders.map((f, i) => (
-            <div key={i} style={{ padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', color: 'white', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <span style={{ fontSize: '1.2rem' }}>📁</span> {f}
-            </div>
-          ))}
+          {loading ? (
+            <div style={{ color: 'white', textAlign: 'center', padding: '20px' }}>Cargando carpetas reales...</div>
+          ) : errorMsg ? (
+            <div style={{ color: 'var(--danger-color)', fontSize: '0.85rem', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>{errorMsg}</div>
+          ) : folders.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No hay subcarpetas creadas aún.</div>
+          ) : (
+            folders.map((f, i) => (
+              <div 
+                key={i} 
+                onClick={() => setCurrentFolder(f)}
+                style={{ padding: '16px', background: currentFolder === f ? 'var(--primary-color)' : 'rgba(255,255,255,0.05)', borderRadius: '12px', color: 'white', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>📁</span> {f}
+              </div>
+            ))
+          )}
         </div>
 
-        <button onClick={onSave} className="btn-primary" style={{ padding: '16px', fontSize: '1rem', marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
-          <span>🚀</span> Subir {filesCount} archivos y Finalizar
+        <button onClick={() => onSave(currentFolder)} className="btn-primary" style={{ padding: '16px', fontSize: '1rem', marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
+          <span>🚀</span> Subir a {currentFolder}
         </button>
       </div>
     </div>
@@ -831,8 +933,8 @@ function DriveExplorerModal({ onClose, onSave, filesCount }) {
 // --- Profile Settings Component ---
 function ProfileSettings() {
   const [activeColor, setActiveColor] = useState('#3b82f6');
-  const [activeFont, setActiveFont] = useState('medium');
   const [scriptUrl, setScriptUrl] = useState(localStorage.getItem('driveScriptUrl') || '');
+  const [geminiKey, setGeminiKey] = useState(localStorage.getItem('geminiApiKey') || '');
 
   const handleColorChange = (color) => {
     setActiveColor(color);
@@ -840,15 +942,10 @@ function ProfileSettings() {
     const glow = color === '#10b981' ? 'rgba(16, 185, 129, 0.4)' : 
                  color === '#f59e0b' ? 'rgba(245, 158, 11, 0.4)' : 
                  color === '#ec4899' ? 'rgba(236, 72, 153, 0.4)' : 
+                 color === '#ef4444' ? 'rgba(239, 68, 68, 0.4)' : 
+                 color === '#eab308' ? 'rgba(234, 179, 8, 0.4)' : 
                  'rgba(59, 130, 246, 0.4)';
     document.documentElement.style.setProperty('--primary-glow', glow);
-  };
-
-  const handleFontChange = (size) => {
-    setActiveFont(size);
-    if (size === 'small') document.documentElement.style.setProperty('--text-scale', '0.85');
-    if (size === 'medium') document.documentElement.style.setProperty('--text-scale', '1');
-    if (size === 'large') document.documentElement.style.setProperty('--text-scale', '1.15');
   };
 
   const handleConnectDrive = () => {
@@ -860,6 +957,15 @@ function ProfileSettings() {
     }
   };
 
+  const handleSaveGeminiKey = () => {
+    const key = window.prompt("Pega aquí tu clave API de Gemini Pro:", geminiKey);
+    if (key !== null) {
+      localStorage.setItem('geminiApiKey', key.trim());
+      setGeminiKey(key.trim());
+      alert("¡Clave guardada! El cerebro de la app ahora es Gemini Pro.");
+    }
+  };
+
   return (
     <div className="animate-in" style={{ paddingBottom: '20px' }}>
       <h2 className="section-title" style={{ marginTop: '16px' }}>Mi Perfil</h2>
@@ -867,13 +973,13 @@ function ProfileSettings() {
       <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px' }}>
         <h3 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Conexión en la Nube</h3>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
-          Configura tu enlace seguro de Google Drive para subir archivos.
+          Configura tus enlaces para guardar datos y usar Inteligencia Artificial.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>👤</div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>📁</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: 'white', fontWeight: '500', fontSize: '0.9rem', wordWrap: 'break-word' }}>Mi Cuenta Drive</div>
+              <div style={{ color: 'white', fontWeight: '500', fontSize: '0.9rem', wordWrap: 'break-word' }}>Google Drive</div>
               {scriptUrl ? (
                 <div style={{ color: 'var(--success-color)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}><span>✓</span> Conectado</div>
               ) : (
@@ -885,7 +991,27 @@ function ProfileSettings() {
             onClick={handleConnectDrive}
             style={{ width: '100%', background: scriptUrl ? 'transparent' : 'var(--primary-color)', border: scriptUrl ? '1px solid var(--border-color)' : 'none', color: 'white', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}
           >
-            {scriptUrl ? 'Cambiar Enlace de Drive' : 'Conectar con Google Drive'}
+            {scriptUrl ? 'Cambiar Enlace de Drive' : 'Conectar Drive'}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>🧠</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: 'white', fontWeight: '500', fontSize: '0.9rem', wordWrap: 'break-word' }}>Gemini Pro API</div>
+              {geminiKey ? (
+                <div style={{ color: 'var(--success-color)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}><span>✓</span> Activado</div>
+              ) : (
+                <div style={{ color: 'var(--danger-color)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}><span>✕</span> Sin clave API</div>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={handleSaveGeminiKey}
+            style={{ width: '100%', background: geminiKey ? 'transparent' : '#a855f7', border: geminiKey ? '1px solid var(--border-color)' : 'none', color: 'white', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}
+          >
+            {geminiKey ? 'Cambiar Clave API' : 'Introducir Clave Gemini'}
           </button>
         </div>
       </div>
@@ -894,21 +1020,14 @@ function ProfileSettings() {
         <h3 style={{ color: 'white', margin: '0 0 16px 0', fontSize: '1.1rem' }}>Personalización</h3>
         
         <label style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'block', marginBottom: '12px' }}>Color Principal de la Aplicación</label>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          {['#3b82f6', '#10b981', '#f59e0b', '#ec4899'].map(color => (
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          {['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#ef4444', '#eab308'].map(color => (
             <div 
               key={color}
               onClick={() => handleColorChange(color)}
               style={{ width: '40px', height: '40px', borderRadius: '50%', background: color, cursor: 'pointer', border: activeColor === color ? '3px solid white' : '3px solid transparent', boxShadow: activeColor === color ? `0 0 15px ${color}` : 'none', transition: 'all 0.2s' }}
             />
           ))}
-        </div>
-
-        <label style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'block', marginBottom: '12px' }}>Tamaño de Letra General</label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => handleFontChange('small')} className="btn-primary" style={{ flex: 1, background: activeFont === 'small' ? 'var(--primary-color)' : 'transparent', border: activeFont === 'small' ? 'none' : '1px solid var(--border-color)', color: activeFont === 'small' ? 'white' : 'var(--text-secondary)' }}>A- (Pequeña)</button>
-          <button onClick={() => handleFontChange('medium')} className="btn-primary" style={{ flex: 1, background: activeFont === 'medium' ? 'var(--primary-color)' : 'transparent', border: activeFont === 'medium' ? 'none' : '1px solid var(--border-color)', color: activeFont === 'medium' ? 'white' : 'var(--text-secondary)' }}>A (Normal)</button>
-          <button onClick={() => handleFontChange('large')} className="btn-primary" style={{ flex: 1, background: activeFont === 'large' ? 'var(--primary-color)' : 'transparent', border: activeFont === 'large' ? 'none' : '1px solid var(--border-color)', color: activeFont === 'large' ? 'white' : 'var(--text-secondary)' }}>A+ (Grande)</button>
         </div>
       </div>
       
