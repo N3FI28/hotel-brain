@@ -952,6 +952,7 @@ function DriveExplorerModal({ onClose, onSave, filesCount }) {
 
         <button onClick={() => onSave(currentFolder)} className="btn-primary" style={{ padding: '16px', fontSize: '1rem', marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
           <span>🚀</span> Subir a {currentFolder}
+        </button>
       </div>
     </div>
   );
