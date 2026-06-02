@@ -48,7 +48,7 @@ const InfoIcon = () => (
 // --- Facilities Map Component ---
 function FacilitiesMap() {
   const [activeTab, setActiveTab] = useState('General');
-  const tabs = ['General', 'Ascensores', 'Filtros'];
+  const tabs = ['General', 'Ascensores', 'Filtros', 'Cuadros Eléctricos'];
   
   const [planImages, setPlanImages] = useState(() => JSON.parse(localStorage.getItem('hotelBrainPlanImages') || '{}'));
   const [markers, setMarkers] = useState(() => JSON.parse(localStorage.getItem('hotelBrainFloorPlansMarkers') || '[]'));
@@ -88,11 +88,33 @@ function FacilitiesMap() {
 
   const handleSaveMarker = () => {
     if (!newMarkerData.title) return alert("Ponle un título al marcador");
-    const newMarker = { ...newMarkerData, id: Date.now() };
-    const newMarkers = [...markers, newMarker];
+    
+    let newMarkers;
+    if (newMarkerData.id) {
+      newMarkers = markers.map(m => m.id === newMarkerData.id ? newMarkerData : m);
+    } else {
+      const newMarker = { ...newMarkerData, id: Date.now() };
+      newMarkers = [...markers, newMarker];
+    }
+    
     setMarkers(newMarkers);
     localStorage.setItem('hotelBrainFloorPlansMarkers', JSON.stringify(newMarkers));
     setIsAddingMarker(false);
+  };
+
+  const handleEditPin = () => {
+    setNewMarkerData(selectedPin);
+    setIsAddingMarker(true);
+    setSelectedPin(null);
+  };
+
+  const handleDeletePin = () => {
+    if (window.confirm("¿Seguro que quieres borrar este marcador?")) {
+      const newMarkers = markers.filter(m => m.id !== selectedPin.id);
+      setMarkers(newMarkers);
+      localStorage.setItem('hotelBrainFloorPlansMarkers', JSON.stringify(newMarkers));
+      setSelectedPin(null);
+    }
   };
 
   const getTypeIcon = (type) => {
@@ -126,77 +148,80 @@ function FacilitiesMap() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>Plano {activeTab}</h3>
         {activeImage && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setZoom(Math.max(1, zoom - 0.5))} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '8px', width: '32px', height: '32px' }}>-</button>
-            <button onClick={() => setZoom(zoom + 0.5)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '8px', width: '32px', height: '32px' }}>+</button>
-            <button onClick={() => setIsFullscreen(!isFullscreen)} style={{ background: 'var(--primary-color)', border: 'none', color: 'white', borderRadius: '8px', width: '32px', height: '32px' }}>{isFullscreen ? '↙' : '↗'}</button>
-          </div>
+          <button onClick={() => { setIsFullscreen(true); setZoom(1); }} style={{ background: 'var(--primary-color)', border: 'none', color: 'white', borderRadius: '8px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', cursor: 'pointer' }}>⤢</button>
         )}
       </div>
 
-      {/* Map Container */}
-      <div 
-        className="glass-panel" 
-        style={{ 
-          flex: 1, 
-          position: isFullscreen ? 'fixed' : 'relative', 
-          top: isFullscreen ? 0 : 'auto', 
-          left: isFullscreen ? 0 : 'auto', 
-          right: isFullscreen ? 0 : 'auto', 
-          bottom: isFullscreen ? 0 : 'auto', 
-          zIndex: isFullscreen ? 1000 : 1, 
-          overflow: 'auto', 
-          minHeight: isFullscreen ? '100vh' : '400px', 
-          borderRadius: isFullscreen ? 0 : '20px', 
-          border: isFullscreen ? 'none' : '1px solid var(--border-color)', 
-          background: '#111' 
-        }}
-      >
-        {isFullscreen && (
-          <button onClick={() => setIsFullscreen(false)} style={{ position: 'fixed', top: 20, right: 20, zIndex: 1010, background: 'rgba(0,0,0,0.5)', border: '1px solid white', color: 'white', borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-        )}
-
-        {!activeImage ? (
-          <div style={{ width: '100%', height: '100%', minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-            <span style={{ fontSize: '3rem', marginBottom: '16px' }}>🗺️</span>
-            <p style={{ marginBottom: '16px' }}>No hay plano subido para {activeTab}.</p>
-            <label style={{ background: 'var(--primary-color)', color: 'white', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-              Subir Imagen del Plano
-              <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleImageUpload} />
-            </label>
-          </div>
-        ) : (
-          <div style={{ position: 'relative', width: '100%', height: 'max-content', transformOrigin: '0 0', transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out' }}>
-            <img 
-              src={activeImage} 
-              alt={`Plano ${activeTab}`} 
-              onClick={handleMapClick}
-              style={{ width: '100%', display: 'block', cursor: 'crosshair', opacity: 0.9 }}
-            />
-            
-            {/* Render Pins */}
-            {activeMarkers.map(pin => (
-              <div 
-                key={pin.id}
-                style={{ 
-                  position: 'absolute', left: `${pin.x}%`, top: `${pin.y}%`, 
-                  transform: `translate(-50%, -50%) scale(${1/zoom})`, // Inversely scale pin so it doesn't get huge
-                  cursor: 'pointer', zIndex: selectedPin?.id === pin.id ? 10 : 1,
-                  background: 'white', borderRadius: '50%', width: '36px', height: '36px', 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)', border: '2px solid var(--primary-color)'
-                }}
-                onClick={(e) => { e.stopPropagation(); setSelectedPin(pin); }}
-              >
-                {getTypeIcon(pin.type)}
-                <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', whiteSpace: 'nowrap', marginTop: '4px' }}>
-                  {pin.title}
+      {/* Normal Map Container (Centered and integrated) */}
+      {!isFullscreen && (
+        <div style={{ flex: 1, position: 'relative', borderRadius: '20px', background: activeImage ? 'transparent' : 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: activeImage ? 'none' : '1px dashed var(--border-color)', minHeight: activeImage ? 'auto' : '300px' }}>
+          {!activeImage ? (
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '3rem', marginBottom: '16px' }}>🗺️</span>
+              <p style={{ marginBottom: '16px' }}>No hay plano subido para {activeTab}.</p>
+              <label style={{ background: 'var(--primary-color)', color: 'white', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Subir Imagen del Plano
+                <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleImageUpload} />
+              </label>
+            </div>
+          ) : (
+            <div style={{ position: 'relative', width: '100%', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+              <img 
+                src={activeImage} 
+                alt={`Plano ${activeTab}`} 
+                onClick={handleMapClick}
+                style={{ width: '100%', display: 'block', cursor: 'crosshair' }}
+              />
+              {activeMarkers.map(pin => (
+                <div 
+                  key={pin.id}
+                  style={{ position: 'absolute', left: `${pin.x}%`, top: `${pin.y}%`, transform: `translate(-50%, -50%)`, cursor: 'pointer', zIndex: selectedPin?.id === pin.id ? 10 : 1, background: 'white', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', border: '2px solid var(--primary-color)' }}
+                  onClick={(e) => { e.stopPropagation(); setSelectedPin(pin); }}
+                >
+                  {getTypeIcon(pin.type)}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fullscreen Map Lightbox */}
+      {isFullscreen && activeImage && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={() => setIsFullscreen(false)} style={{ position: 'absolute', top: 20, right: 20, zIndex: 2010, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          
+          <div style={{ overflow: 'auto', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out', margin: 'auto' }}>
+              <img 
+                src={activeImage} 
+                alt={`Plano ${activeTab}`} 
+                onClick={handleMapClick}
+                style={{ maxWidth: '100vw', maxHeight: '100vh', objectFit: 'contain', cursor: 'crosshair', display: 'block' }}
+              />
+              {activeMarkers.map(pin => (
+                <div 
+                  key={pin.id}
+                  style={{ position: 'absolute', left: `${pin.x}%`, top: `${pin.y}%`, transform: `translate(-50%, -50%) scale(${1/zoom})`, cursor: 'pointer', zIndex: selectedPin?.id === pin.id ? 10 : 1, background: 'white', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', border: '2px solid var(--primary-color)' }}
+                  onClick={(e) => { e.stopPropagation(); setSelectedPin(pin); }}
+                >
+                  {getTypeIcon(pin.type)}
+                  {zoom > 1 && (
+                    <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', whiteSpace: 'nowrap', marginTop: '4px' }}>
+                      {pin.title}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+          
+          <div style={{ position: 'absolute', bottom: 30, display: 'flex', gap: '16px', zIndex: 2010 }}>
+            <button onClick={() => setZoom(Math.max(1, zoom - 0.5))} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '50%', width: '50px', height: '50px', fontSize: '1.5rem', backdropFilter: 'blur(5px)', cursor: 'pointer' }}>-</button>
+            <button onClick={() => setZoom(zoom + 0.5)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '50%', width: '50px', height: '50px', fontSize: '1.5rem', backdropFilter: 'blur(5px)', cursor: 'pointer' }}>+</button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Añadir Marcador */}
       {isAddingMarker && (
@@ -668,7 +693,12 @@ function Dashboard() {
                   ))}
                 </div>
               </div>
-
+              
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', padding: '0 24px 24px 24px' }}>
+              <button onClick={handleDeletePin} className="btn-primary" style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger-color)', border: '1px solid rgba(239, 68, 68, 0.3)', boxShadow: 'none' }}>🗑️ Borrar</button>
+              <button onClick={handleEditPin} className="btn-primary" style={{ flex: 1, background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary-color)', border: '1px solid rgba(59, 130, 246, 0.3)', boxShadow: 'none' }}>✏️ Editar</button>
             </div>
           </div>
         </div>
@@ -1051,7 +1081,7 @@ function App() {
           onClick={() => setCurrentTab('profile')}
           style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 10px var(--primary-glow)' }}
         >
-          AD
+          N
         </div>
       </header>
 
