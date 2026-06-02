@@ -162,7 +162,7 @@ function FacilitiesMap() {
             <p style={{ marginBottom: '16px' }}>No hay plano subido para {activeTab}.</p>
             <label style={{ background: 'var(--primary-color)', color: 'white', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               Subir Imagen del Plano
-              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+              <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleImageUpload} />
             </label>
           </div>
         ) : (
@@ -703,7 +703,6 @@ function DataEntryModule() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [showDriveModal, setShowDriveModal] = useState(false);
-  const [showDrivePicker, setShowDrivePicker] = useState(false);
 
   const locations = ['Cuadro C-1 (Pasillo Este)', 'Habitación 101', 'Habitación 102', 'Recepción', 'Sala de Máquinas', 'Piscina Exterior'];
   const filteredLocs = locations.filter(l => l.toLowerCase().includes(locQuery.toLowerCase()));
@@ -723,12 +722,10 @@ function DataEntryModule() {
       alert("Por favor, rellena al menos el título, ubicación y descripción.");
       return;
     }
-    // Process photos to base64 so they persist in localStorage (unless they are already Drive links)
+    // Process photos to base64 so they persist in localStorage
     const photoUrls = [];
     for (const fileObj of selectedFiles) {
-      if (fileObj.type === 'drive') {
-        photoUrls.push(fileObj.url);
-      } else if (fileObj.type.startsWith('image/')) {
+      if (fileObj.type.startsWith('image/')) {
         const promise = new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(e.target.result);
@@ -831,12 +828,7 @@ function DataEntryModule() {
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
             {selectedFiles.map((file, i) => (
               <div key={i} style={{ width: '60px', height: '60px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-                {file.type === 'drive' ? (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(59, 130, 246, 0.2)', fontSize: '0.6rem', color: 'white', textAlign: 'center', padding: '2px' }}>
-                    <span style={{ fontSize: '1.2rem', marginBottom: '2px' }}>☁️</span>
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{file.name}</span>
-                  </div>
-                ) : file.type.startsWith('image/') ? (
+                {file.type.startsWith('image/') ? (
                   <img src={file.preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="preview" />
                 ) : (
                   <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', fontSize: '0.8rem', color: 'white' }}>PDF</div>
@@ -844,23 +836,13 @@ function DataEntryModule() {
                 <button onClick={() => setSelectedFiles(selectedFiles.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', border: 'none', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
             ))}
-            
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <label style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px dashed var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                <span style={{ fontSize: '1.2rem' }}>📷</span>
-                <span style={{ fontSize: '0.6rem' }}>Local</span>
-                <input type="file" multiple accept="image/*,video/*,application/pdf" style={{ display: 'none' }} onChange={handleFileSelect} />
-              </label>
-              
-              <button 
-                onClick={() => setShowDrivePicker(true)} 
-                style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px dashed var(--primary-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary-color)' }}
-              >
-                <span style={{ fontSize: '1.2rem' }}>☁️</span>
-                <span style={{ fontSize: '0.6rem' }}>Drive</span>
-              </button>
-            </div>
+            <label style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px dashed var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '1.5rem' }}>+</span>
+              <input type="file" multiple accept="image/*,video/*,application/pdf" style={{ display: 'none' }} onChange={handleFileSelect} />
+            </label>
           </div>
+          
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>Pulsa "+" para abrir tu galería o explorador de archivos.</p>
         </div>
 
         <button onClick={() => setShowDriveModal(true)} className="btn-primary" style={{ padding: '16px', fontSize: '1rem', marginTop: '8px', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
@@ -869,16 +851,6 @@ function DataEntryModule() {
       </div>
 
       {showDriveModal && <DriveExplorerModal onClose={() => setShowDriveModal(false)} onSave={handleSaveToDriveAndBrain} filesCount={selectedFiles.length} />}
-      
-      {showDrivePicker && (
-        <DriveFilePickerModal 
-          onClose={() => setShowDrivePicker(false)} 
-          onSelectFile={(file) => {
-            setSelectedFiles([...selectedFiles, { name: file.name, type: 'drive', url: file.url }]);
-            setShowDrivePicker(false);
-          }} 
-        />
-      )}
     </div>
   );
 }
@@ -958,114 +930,6 @@ function DriveExplorerModal({ onClose, onSave, filesCount }) {
   );
 }
 
-function DriveFilePickerModal({ onClose, onSelectFile }) {
-  const [currentFolderId, setCurrentFolderId] = useState('root');
-  const [currentFolderName, setCurrentFolderName] = useState('IA miramar');
-  const [history, setHistory] = useState([]);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState(null);
-
-  useEffect(() => {
-    const fetchItems = async () => {
-      setLoading(true);
-      setErrorMsg(null);
-      const scriptUrl = localStorage.getItem('driveScriptUrl');
-      if (!scriptUrl) {
-        setErrorMsg('No hay enlace de Drive configurado en el Perfil.');
-        setLoading(false);
-        return;
-      }
-      try {
-        const separator = scriptUrl.includes('?') ? '&' : '?';
-        const query = currentFolderId === 'root' ? '' : `&folderId=${currentFolderId}`;
-        const url = `${scriptUrl}${separator}action=list_drive${query}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (data.status === 'success') {
-          setItems(data.items || []);
-          setCurrentFolderName(data.currentFolderName);
-          if (currentFolderId === 'root') {
-            setCurrentFolderId(data.currentFolderId);
-          }
-        } else {
-          setErrorMsg(data.message || 'Error al obtener archivos.');
-        }
-      } catch (err) {
-        setErrorMsg('Error de conexión. Asegúrate de actualizar el Script de Google con el último código.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchItems();
-  }, [currentFolderId]);
-
-  const handleFolderClick = (id, name) => {
-    setHistory([...history, { id: currentFolderId, name: currentFolderName }]);
-    setCurrentFolderId(id);
-  };
-
-  const handleBack = () => {
-    if (history.length > 0) {
-      const prev = history[history.length - 1];
-      setHistory(history.slice(0, -1));
-      setCurrentFolderId(prev.id);
-    }
-  };
-
-  const handleGoRoot = () => {
-    setHistory([{ id: currentFolderId, name: currentFolderName }]);
-    setCurrentFolderId('root_real'); // A special flag to force the root folder if we want to bypass the default
-  };
-
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-      <div className="animate-in" style={{ background: 'var(--surface-color)', borderRadius: '24px', width: '100%', maxWidth: '400px', maxHeight: '80vh', padding: '24px', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, color: 'white', fontSize: '1.2rem' }}>Explorar Drive</h3>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>✕</button>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          {history.length > 0 && (
-            <button onClick={handleBack} style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', padding: 0, fontSize: '1.2rem', marginRight: '8px' }}>←</button>
-          )}
-          <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>{currentFolderName}</span>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {loading ? (
-            <div style={{ color: 'white', textAlign: 'center', padding: '20px' }}>Cargando archivos...</div>
-          ) : errorMsg ? (
-            <div style={{ color: 'var(--danger-color)', fontSize: '0.85rem', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>{errorMsg}</div>
-          ) : items.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Carpeta vacía o sin archivos compatibles.</div>
-          ) : (
-            items.map((item, i) => (
-              <div 
-                key={i} 
-                onClick={() => item.type === 'folder' ? handleFolderClick(item.id, item.name) : onSelectFile(item)}
-                style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', color: 'white', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>{item.type === 'folder' ? '📁' : '📄'}</span>
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.type === 'folder' ? 'Carpeta' : 'Archivo Drive'}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        
-        {history.length === 0 && (
-          <button onClick={handleGoRoot} className="btn-primary" style={{ padding: '12px', fontSize: '0.9rem', marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center', background: 'transparent', border: '1px solid var(--primary-color)' }}>
-            Ir a la raíz de Mi Drive
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // --- Profile Settings Component ---
 function ProfileSettings() {
